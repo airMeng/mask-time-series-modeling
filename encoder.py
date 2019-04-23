@@ -23,8 +23,8 @@ class MTS(nn.Module):
     def forward(self, src, src_mask):
         "Take in and process masked src and target sequences."
         memory = self.encoder(self.src_embed(src), src_mask)
-        output = self.generator(memory)
-        return torch.masked_select(output,src_mask)
+        output = self.generator(memory).squeeze()
+        return torch.mul(output,(1-src_mask).type(torch.float32)).unsqueeze(-1)
 
 
 def clones(module, N):
@@ -44,7 +44,7 @@ class Encoder(nn.Module):
         "Pass the input (and mask) through each layer in turn."
         for layer in self.layers:
             x = layer(x, mask)
-        return self.generator(self.norm((x)))
+        return self.norm((x))
 
 
 class LayerNorm(nn.Module):
@@ -172,14 +172,18 @@ class PositionalEncoding(nn.Module):
         # Compute the positional encodings once in log space.
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0., max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0., d_model, 2) * -(math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        div_term_sin = torch.exp(torch.arange(0., d_model,2) * -(math.log(10000.0) / d_model))
+        div_term_cos = torch.exp(torch.arange(1., d_model, 2) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term_sin)
+        pe[:, 1::2] = torch.cos(position * div_term_cos)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        print(x)
+        p_e=Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        print(p_e.dtype)
+        x = x + p_e
         return self.dropout(x)
 
 

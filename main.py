@@ -65,23 +65,32 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def loss_backprop(generator, criterion, out, targets):
+def loss_backprop(criterion, out, targets):
     """
     Memory optmization. Compute each timestep separately and sum grads.
     """
     assert out.size(1) == targets.size(1)
     total = 0.0
     out_grad = []
-    for i in range(out.size(1)):
-        out_column = Variable(out[:, i].data, requires_grad=True)
-        gen = generator(out_column)
-        loss = criterion(gen, targets[:, i])
-        total += loss.item()
-        loss.backward()
-        out_grad.append(out_column.grad.data.clone())
+    out_column=Variable(out.data,requires_grad=True)
+    loss = criterion(out_column, targets)
+    total += loss.item()
+    loss.backward()
+    out_grad.append(out_column.grad.data.clone())
     out_grad = torch.stack(out_grad, dim=1)
     out.backward(gradient=out_grad)
     return total
+
+
+def SimpleLossCompute(criterion,x,y,opt):
+
+    loss = criterion(x.contiguous().view(-1, x.size(-1)),
+                          y.contiguous().view(-1))
+    loss.backward()
+    if opt is not None:
+        opt.step()
+        opt.optimizer.zero_grad()
+    return loss.item()
 
 
 def subsequent_mask(size):
@@ -92,8 +101,10 @@ def subsequent_mask(size):
 
 
 def make_std_mask(src, pad):
-    src_mask = (src != pad).unsqueeze(-2)
+    #src[:, 2:4] = 0
+    #src_mask = (src.sum(0) != pad).unsqueeze(-2)
     # src_mask = src_mask & Variable(subsequent_mask(src.size(-1)).type_as(src_mask.data))
+    src_mask=torch.tensor([1,1,0,0,1,1,1,1,1,1],dtype=torch.uint8)
     return src_mask
 
 
@@ -102,12 +113,14 @@ def train_epoch(train_iter, model, criterion, opt, transpose=False):
     for i, batch in enumerate(train_iter):
         src, src_mask = \
             batch.src, batch.src_mask
-        src_masked=torch.masked_select(src,src_mask)
-        out = model.forward(src, src_mask)
-        loss = loss_backprop(model.generator, criterion, out, src_masked)
-
-        opt.step()
-        opt.optimizer.zero_grad()
+        src_masked=src.clone()
+        src_masked[:,2:4,:]=0
+        target=torch.mul(src[:,:,-1],(1-src_mask).type(torch.float32)).unsqueeze(-1)
+        out = model.forward(src_masked, src_mask)
+        #loss = loss_backprop(criterion, out, target)
+        loss=SimpleLossCompute(criterion,out,target,opt)
+        # opt.step()
+        # opt.optimizer.zero_grad()
         if i % 10 == 1:
             print(i, loss, opt._rate)
 
@@ -120,18 +133,31 @@ class Batch:
 
 def data_gen(batch, nbatches):
     for i in range(nbatches):
-        data = torch.from_numpy(np.random.randn(batch, 10))
+        data = torch.from_numpy(np.random.randn(batch, 10,5)).type(torch.FloatTensor)
         src = Variable(data, requires_grad=False)
-        src[:,-6:-4]=0
+        #src[:,:,2:4]=0
         src_mask = make_std_mask(src, 0)
         print(src)
         print(src_mask)
         yield Batch(src, src_mask)
 
-V=11
-criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
+V=5
+#criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
+criterion=nn.MSELoss()
 model = make_model()
 model_opt = get_std_opt(model)
-for epoch in range(2):
+for epoch in range(20):
     print('epoch : '+str(epoch))
     train_epoch(data_gen(5, 5), model, criterion, model_opt)
+
+
+model.eval()
+src=torch.from_numpy(np.random.randn(1, 10,5)).type(torch.FloatTensor)
+src_mask = make_std_mask(src, 0)
+src_masked=src.clone()
+src_masked[:,2:4,:]=0
+target=torch.mul(src[:,:,-1],(1-src_mask).type(torch.float32)).unsqueeze(-1)
+out = model.forward(src_masked, src_mask)
+print('===========================================================================')
+print(src)
+print(out)
