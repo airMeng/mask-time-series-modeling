@@ -24,8 +24,8 @@ class MTS(nn.Module):
         "Take in and process masked src and target sequences."
         memory = self.encoder(self.src_embed(src), src_mask)
         output = self.generator(memory).squeeze()
-        return torch.mul(output,(1-src_mask).type(torch.float32)).unsqueeze(-1)
-
+        #return torch.mul(output,(1-src_mask).type(torch.float32)).unsqueeze(-1)
+        return output
 
 def clones(module, N):
     "Produce N identical layers."
@@ -195,10 +195,12 @@ class Generator(nn.Module):
         self.d_model=d_model
         self.linear0 = nn.Linear(d_model, 100)
         self.linear1 = nn.Linear(100, 1)
-    def forward(self, x):
-        return self.linear1(self.linear0(x))
 
-def make_model(N=6, d_model=5, d_ff=2048, h=1, dropout=0.1):
+    def forward(self, x):
+        return self.linear1(self.linear0(x))[-1]
+
+
+def make_model(N=6, d_model=25, d_ff=2048, h=1, dropout=0.1):
     "Construct a model object based on hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model, dropout)
@@ -215,6 +217,4 @@ def make_model(N=6, d_model=5, d_ff=2048, h=1, dropout=0.1):
     return model
 
 
-tmp_model=make_model(10)
-print(tmp_model)
 

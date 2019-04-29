@@ -119,8 +119,8 @@ def train_epoch(train_iter, model, criterion, opt, transpose=False):
         out = model.forward(src_masked, src_mask)
         #loss = loss_backprop(criterion, out, target)
         loss=SimpleLossCompute(criterion,out,target,opt)
-        # opt.step()
-        # opt.optimizer.zero_grad()
+        opt.step()
+        opt.optimizer.zero_grad()
         if i % 10 == 1:
             print(i, loss, opt._rate)
 
