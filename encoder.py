@@ -23,7 +23,7 @@ class MTS(nn.Module):
     def forward(self, src, src_mask):
         "Take in and process masked src and target sequences."
         memory = self.encoder(self.src_embed(src), src_mask)
-        output = self.generator(memory).squeeze()
+        output = self.generator(memory)
         #return torch.mul(output,(1-src_mask).type(torch.float32)).unsqueeze(-1)
         return output
 
@@ -180,9 +180,9 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        print(x)
+        print(x.shape)
         p_e=Variable(self.pe[:, :x.size(1)], requires_grad=False)
-        print(p_e.dtype)
+        print(p_e.shape)
         x = x + p_e
         return self.dropout(x)
 
@@ -197,10 +197,10 @@ class Generator(nn.Module):
         self.linear1 = nn.Linear(100, 1)
 
     def forward(self, x):
-        return self.linear1(self.linear0(x))[-1]
+        return self.linear1(self.linear0(x))[-1][-1]
 
 
-def make_model(N=6, d_model=25, d_ff=2048, h=1, dropout=0.1):
+def make_model(N=12, d_model=25, d_ff=2048, h=1, dropout=0.1):
     "Construct a model object based on hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model, dropout)

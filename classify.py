@@ -55,19 +55,53 @@ def SimpleLossCompute(criterion,x,y,opt):
 def train_epoch(train_iter, model, criterion, opt, transpose=False):
     model.train()
     for i, batch in enumerate(train_iter):
-        src, src_mask,target = batch['data'].type(torch.float32), batch['mask'],batch['label']
+        src, src_mask,target = batch['data'].type(torch.float32).cuda(), batch['mask'].cuda(),batch['label'].type(torch.float32).cuda()
         out = model.forward(src, src_mask)
+        print(out.shape)
+        print(target.shape)
         loss=SimpleLossCompute(criterion,out,target,opt)
         opt.step()
         opt.optimizer.zero_grad()
-        if i % 10 == 1:
+        if i % 10 == 0:
             print(i, loss, opt._rate)
 
 
 criterion=nn.MSELoss()
 model = make_model()
+model.cuda()
 model_opt = get_std_opt(model)
 data_loader=load_data()
-for epoch in range(20):
+for epoch in range(10):
     print('epoch : '+str(epoch))
     train_epoch(data_loader, model, criterion, model_opt)
+
+
+
+model.eval()
+data_test=np.load('./data/test/P-1.npy')
+l_test=data_test.shape[0]
+
+
+def save_data(name,data,x,y):
+    np.savez(name,data,x,y)
+
+
+for i in [1899,3289,4286]:
+    d=data_test[i:(i+350),:]
+    d_test=torch.FloatTensor(data_test[i:(i+200),:]).unsqueeze(0)
+    mask=torch.from_numpy(np.ones((len(d_test),1))).type(torch.uint8)
+    out=model.forward(d_test.cuda(),mask.cuda())
+    for layer in range(0, 6):
+    #fig, axs = plt.subplots(1,4, figsize=(20, 10))
+        print("Encoder Layer", layer+1)
+        #for h in range(4):
+        name='./results/'+'data '+str(i)+' layer '+str(layer)+'.npz'
+        h=0
+        save_data(name,model.encoder.layers[layer].self_attn.attn[0, h].data.cpu(), 
+            d, d if h ==0 else [])
+    # plt.show()
+def draw(data, x, y, ax):
+    seaborn.heatmap(data, 
+                    xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
+                    cbar=False, ax=ax)
+

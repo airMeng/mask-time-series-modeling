@@ -10,7 +10,7 @@ def read_data():
     labeled_anomalies=pd.read_csv('labeled_anomalies.csv',index_col=0)
     path='./data/test'
     files=os.listdir(path)
-    train_lenth=500
+    train_lenth=200
     """
     x_train1=[]
     x_train0=[]
@@ -58,9 +58,9 @@ def make_weights_for_balanced_classes(y):
     y_1=sum(y)
     for i in range(len(y)):
         if y[i]==0:
-            weight[i]=float(y_1)/float(len(y))
+            weight[i]=0.5*float(y_1)/float(len(y))
         else:
-            weight[i]=1.
+            weight[i]=0.5
     return weight
 
 
@@ -70,7 +70,7 @@ def load_data():
     weights = make_weights_for_balanced_classes(y)
     weights = torch.DoubleTensor(weights)
     sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
-    dataloader = DataLoader(series_dataset, batch_size=100, num_workers=10,sampler=sampler)
+    dataloader = DataLoader(series_dataset, batch_size=32, num_workers=10,sampler=sampler)
     return dataloader
 
 load_data()
